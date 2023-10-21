@@ -213,3 +213,11 @@ class Document:
         doc.annotate(**field_name_to_span_groups)
 
         return doc
+    
+    def vis_annotate(self, vis_fields: Optional[List[str]]):
+        # 1) checkout doc contain images
+
+        # 2) convert each annotate fields in doc images
+
+        # 3) save to output path, or show by plt.subplot
+        pass
