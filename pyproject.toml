@@ -134,7 +134,8 @@ svm_word_predictor = [
     'scikit-learn',
     'scipy',
     'numpy',
-    'tokenizers'
+    'tokenizers',
+    'joblib',
 ]
 recipes = [
     'layoutparser',
