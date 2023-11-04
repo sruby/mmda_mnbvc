@@ -229,7 +229,7 @@ class Document:
             grouped_layouts[page_number].append(layout)
         return json_dict, grouped_layouts
     
-    def vis_annotate(self, output_dir='tmp', font_size=20, font_path='/System/Library/Fonts/Supplemental/Arial.ttf'):
+    def vis_annotate(self, output_dir='tmp', font_size=20, font_path='data/fonts/Arial.ttf'):
         """
         获取layout，然后在图片上绘制每个layout标注的边界框和类型标签。
         处理后的图片将保存在指定的输出目录中。
