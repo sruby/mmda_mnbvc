@@ -212,68 +212,111 @@ class Document:
 
         return doc
     
-    def _group_layouts(self):
+    def _group_layouts_and_tokens(self):
         """
-        将JSON格式的布局数据按页面编号分组。
+        将JSON格式的layout和token按页面编号分组。
         方法调用对象的 `to_json` 方法，遍历layout，按照每个layout所在的页面编号分组存放在一个字典中。
-
+        # 2) convert each annotate fields in doc images
         Returns:
-            tuple: 返回一个元组，第一个元素是包含图片的JSON字典，第二个元素是按页面分组的布局字典。
+            tuple: 返回一个元组，第一个元素是包含图片的JSON字典，第二个元素是按页面分组的layout字典和token字典。
         """
-        grouped_layouts = {}
+        grouped_data = {}
         json_dict = self.to_json(with_images=True)
+
+        # 分组 layout
         for layout in json_dict["layout"]:
             page_number = layout["box_group"]["boxes"][0]["page"]
-            if page_number not in grouped_layouts:
-                grouped_layouts[page_number] = []
-            grouped_layouts[page_number].append(layout)
-        return json_dict, grouped_layouts
+            if page_number not in grouped_data:
+                grouped_data[page_number] = {"layouts": [], "tokens": []}
+            grouped_data[page_number]["layouts"].append(layout)
+
+        # 分组 tokens
+        for token in json_dict["tokens"]:
+            for span in token["spans"]:
+                page_number = span["box"]["page"]
+                if page_number not in grouped_data:
+                    grouped_data[page_number] = {"layouts": [], "tokens": []}
+                grouped_data[page_number]["tokens"].append(token)
+
+        return json_dict, grouped_data
     
-    def vis_annotate(self, output_dir='tmp', font_size=20, font_path='data/fonts/Arial.ttf'):
+    def vis_annotate(self, output_dir='tmp', layout_font_size=20, token_font_size=8, 
+                 font_path='data/fonts/Tahoma.ttf',
+                 vis_token=False, vis_layout=True, layout_outline_color='blue', 
+                 layout_outline_width=5, token_outline_color='red', token_outline_width=3,
+                 token_text_color='white', token_bg_color='black'):
         """
-        获取layout，然后在图片上绘制每个layout标注的边界框和类型标签。
+        获取layout，然后在图片上绘制每个layout标注的边界框和类型标签、token标注的边界框和id。
         处理后的图片将保存在指定的输出目录中。
 
         Args:
-            output_dir (str): 图片保存的目录，默认为 'tmp'。
-            font_size (int): 标注使用的字体大小，默认为20。
-            font_path (str): 标注使用的字体路径，默认为系统的Arial字体。
-
-        Returns:
-            None: 此方法不返回任何内容，处理后的图片直接保存到磁盘上。
-
-        Raises:
-            OSError: 如果创建输出目录时出现问题，可能会抛出 OSError。
-            IOError: 如果读取图片、字体文件或保存图片时出现问题，可能会抛出 IOError。
+            output_dir (str): 图像保存的目标文件夹，默认为 'tmp'。
+            layout_font_size (int): 用于布局标签的字体大小，默认为 20。
+            token_font_size (int): 用于标记标签的字体大小，默认为 8。
+            font_path (str): 字体文件的路径，默认为 'data/fonts/Tahoma.ttf'。
+            vis_token (bool): 是否可视化标记，即是否在图像上绘制标记的边界框和标签，默认为 False。
+            vis_layout (bool): 是否可视化布局，即是否在图像上绘制布局的边界框和标签，默认为 True。
+            layout_outline_color (str): 布局边界框的颜色，默认为 'blue'。
+            layout_outline_width (int): 布局边界框的线宽，默认为 5。
+            token_outline_color (str): 标记边界框的颜色，默认为 'red'。
+            token_outline_width (int): 标记边界框的线宽，默认为 3。
+            token_text_color (str): 标记文本的颜色，默认为 'white'。
+            token_bg_color (str): 标记文本背景的颜色，默认为 'black'。
+        Return:
+            None
         """
-        font = ImageFont.truetype(font_path, font_size)
-        json_dict, grouped_layouts = self._group_layouts()
+        font_layout = ImageFont.truetype(font_path, layout_font_size)
+        font_token = ImageFont.truetype(font_path, token_font_size)
+        json_dict, grouped_data = self._group_layouts_and_tokens()
         for index, image_data in enumerate(json_dict['images']):
             image_bytes = base64.b64decode(image_data)
             image = Image.open(io.BytesIO(image_bytes))
             draw = ImageDraw.Draw(image)
-            layouts = grouped_layouts.get(index, [])
 
-            for i, layout in enumerate(layouts):
-                box_group = layout['box_group']
-                for j, box in enumerate(box_group['boxes']):
-                    left = box['left'] * image.width
-                    top = box['top'] * image.height
-                    right = left + box['width'] * image.width
-                    bottom = top + box['height'] * image.height
+            page_data = grouped_data.get(index, {})
 
-                    box_type = box_group['metadata']['type']
-                    outline_color = 'blue'
-                    outline_width = 5
+            # 绘制layout（如果指定）
+            if vis_layout:
+                for layout in page_data.get("layouts", []):
+                    box_group = layout['box_group']
+                    for box in box_group['boxes']:
+                        left = box['left'] * image.width
+                        top = box['top'] * image.height
+                        right = left + box['width'] * image.width
+                        bottom = top + box['height'] * image.height
 
-                    draw.rectangle([left, top, right, bottom], outline=outline_color, width=outline_width)
-                    text_size = font.getsize(box_type)
-                    text_position = (left, top)
-                    bg_rectangle_coords = (text_position[0], text_position[1], text_position[0] + text_size[0], text_position[1] + text_size[1])
+                        box_type = box_group['metadata']['type']
 
-                    draw.rectangle(bg_rectangle_coords, fill='black')
-                    draw.text(text_position, box_type, font=font, fill='white')
+                        draw.rectangle([left, top, right, bottom], outline=layout_outline_color, width=layout_outline_width)
+                        text_size = font_layout.getsize(box_type)
+                        text_position = (left, top)
+                        bg_rectangle_coords = (text_position[0], text_position[1], text_position[0] + text_size[0], text_position[1] + text_size[1])
 
+                        draw.rectangle(bg_rectangle_coords, fill=token_bg_color)
+                        draw.text(text_position, box_type, font=font_layout, fill=token_text_color)
+
+            # 绘制token（如果指定）
+            if vis_token:
+                for token in page_data.get("tokens", []):
+                    token_id = token["id"]
+                    for span in token["spans"]:
+                        box = span["box"]
+                        left = box['left'] * image.width
+                        top = box['top'] * image.height
+                        right = left + box['width'] * image.width
+                        bottom = top + box['height'] * image.height
+
+                        draw.rectangle([left, top, right, bottom], outline=token_outline_color, width=token_outline_width)
+                        
+                        # 绘制token ID
+                        text_size = font_token.getsize(str(token_id))
+                        text_position = (left, top)  # 在边框下方显示ID
+                        bg_rectangle_coords = (text_position[0], text_position[1], text_position[0] + text_size[0], text_position[1] + text_size[1])
+
+                        draw.rectangle(bg_rectangle_coords, fill=token_bg_color) 
+                        draw.text(text_position, str(token_id), font=font_token, fill=token_text_color)
+
+            # 保存处理后的图片
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
             output_path = os.path.join(output_dir, f'output_image_{index}.png')
