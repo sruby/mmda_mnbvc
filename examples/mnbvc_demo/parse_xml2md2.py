@@ -8,13 +8,53 @@ namespaces = {
     # Add other namespaces if needed
 }
 
+
+def parse_formula_to_latex(formula_element):
+    # Extract the text content of the formula element
+    formula_text = formula_element.text.strip()
+    # Replace the formula with LaTeX delimiters for display math mode
+    latex_formula = f"$$\n{formula_text}\n$$"
+    return latex_formula
+
+
+def parse_table_to_markdown(table_element):
+    # 开始Markdown表格
+    md_table = ""
+
+    # 遍历每一行
+    for row in table_element.findall('.//row'):
+        md_row = []
+        for cell in row.findall('.//cell'):
+            # 检查是否有跨列的属性
+            colspan = cell.get('cols')
+            cell_text = cell.text.strip() if cell.text else ""
+            if colspan:
+                # 对于跨列的单元格，我们将重复该单元格内容
+                md_row.extend([cell_text] * int(colspan))
+            else:
+                md_row.append(cell_text)
+        # 创建Markdown表格的行
+        md_table += "| " + " | ".join(md_row) + " |\n"
+
+    # 创建Markdown表格的分隔符行
+    # 假设所有列的格式都是相同的
+    headers = md_table.split('\n')[0].split('|')[1:-1]  # 第一个和最后一个元素是空字符串，所以跳过
+    separator = "| " + " | ".join(['---'] * len(headers)) + " |\n"
+
+    # 将分隔符行插入表头下方
+    md_table = md_table.split('\n')
+    md_table.insert(1, separator)
+
+    return '\n'.join(md_table) + "\n"
+
+
 def convert(xml_content):
     # Parse the XML content
     root = ET.fromstring(xml_content)
 
     # Extract and format the title
     title = root.find('.//tei:titleStmt/tei:title', namespaces=namespaces).text
-    md = f'# {title}\n'
+    mdContent = f'# {title}\n'
 
     # Extract and format the authors' names
     authors = root.findall('./tei:teiHeader//tei:author/tei:persName', namespaces=namespaces)
@@ -26,15 +66,15 @@ def convert(xml_content):
 
         if surname is not None:
             surname = surname.text
-        md += f'- {forename} {surname}\n'
-    md += '\n'
+        mdContent += f'- {forename} {surname}\n'
+    mdContent += '\n'
 
     # Extract and format the abstract
     abstract = root.find('.//tei:abstract', namespaces=namespaces)
-    md += f'## Abstract\n'
+    mdContent += f'## Abstract\n'
     abstract_s_list = abstract.findall('.//tei:s', namespaces=namespaces)
     for abstract_s in abstract_s_list:
-        md += f'{abstract_s.text}'
+        mdContent += f'{abstract_s.text}'
 
     # extract and format the body
     body_div_list = root.findall('./tei:text/tei:body/tei:div', namespaces=namespaces)
@@ -44,15 +84,42 @@ def convert(xml_content):
         head_text = div_head.text
         if head_n is not None:
             head_text = head_n + ' '+ head_text
-        md += f'\n## {head_text}\n'
+        mdContent += f'\n## {head_text}\n'
 
-        body_dev_p_list = body_div.findall('./tei:p', namespaces=namespaces)
-        for body_div_p in body_dev_p_list:
-            body_div_p_s_list = body_div_p.findall('tei:s', namespaces=namespaces)
-            for body_div_p_s in body_div_p_s_list :
-                md += f'{body_div_p_s.text}'
-            md += '\n'
-    return md
+        for child  in body_div:
+            if child.tag == 'p':
+                body_dev_p_list = body_div.findall('./tei:p', namespaces=namespaces)
+                for body_div_p in body_dev_p_list:
+                    body_div_p_s_list = body_div_p.findall('tei:s', namespaces=namespaces)
+                    for body_div_p_s in body_div_p_s_list :
+                        mdContent += f'{body_div_p_s.text}'
+                    mdContent += '\n'
+            elif child.tag == 'formula':
+                mdContent += parse_formula_to_latex(child)
+            else:
+                print('warning:'+child.tag)
+    # extract figure
+    figureDict = {}
+    body_figure_list = root.findall('./tei:text/tei:body/tei:figure', namespaces=namespaces)
+    for body_figure in body_figure_list:
+        figure_type = body_figure.get('type')
+        figureid = body_figure.get('xml:id')
+        if figure_type is not None and figure_type == 'table':
+            tablecontent = parse_table_to_markdown(body_figure)
+            figureDict.put(figureid, tablecontent)
+        else:
+            figure_s = body_figure.findall('.//tei:s', namespaces=namespaces)
+            figure_graphic = ''
+            for figure_s in figure_s:
+                figure_graphic += f'{figure_s.text}'
+
+
+    # extract reference
+
+
+    return mdContent
+
+
 
 # parse
 XML_PATH = './e5910c027af0ee9c1901c57f6579d903aedee7f4.xml'
