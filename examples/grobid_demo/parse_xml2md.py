@@ -89,7 +89,7 @@ def convert(xml_content):
 
         tag_prefix =  '{http://www.tei-c.org/ns/1.0}'
         for child  in body_div:
-            print("child.tag:"+child.tag , child.attrib)
+            print("child_tag:"+child.tag , child.attrib)
             if child.tag == tag_prefix + 'p':
                 # 段落前增加空格
                 mdContent +='  '
@@ -98,19 +98,33 @@ def convert(xml_content):
                     body_div_p_s_text = body_div_p_s.text
                     print("body_div_p_s_text:"+body_div_p_s_text)
                     mdContent += f'{body_div_p_s_text}'
-                #     extract figure无法正确抽取到节点
-                    ref_element  = body_div_p_s.find('./ref[@type="figure"]')
-                    if ref_element is not None:
-                        # target = ref_element.get('target')
-                        ref_element_tostring = ref_element.tostring()
-                        print(ref_element_tostring)
-                        mdContent += f'{ref_element_tostring}'
+                #     parse ref
+                    # Iterate over the XML elements inside the s node
+                    for elem in body_div_p_s:
+                        # Check for 'ref' tag and append appropriate markdown
+                        if elem.tag == tag_prefix + 'ref':
+                            ref_type = elem.attrib.get('type')
+                            if ref_type == 'bibr':
+                                # Convert bibliography reference to markdown citation format
+                                mdContent+=(f"[{elem.text}]")
+                                print('markdown_elements_bibr:', mdContent)
+                            elif ref_type == 'figure':
+                                # Convert figure reference to markdown image format (as a placeholder here)
+                                mdContent+=(f"{elem.text}")
+                                ref_string = ET.tostring(elem, encoding='unicode')
+                                mdContent += (f"{ref_string}")
+                                print('markdown_elements_figure:', mdContent)
+                        # Append the tail text if it exists (text after a subelement)
+                        if elem.tail:
+                            print(elem.tail)
+                            mdContent+=(elem.tail)
                 mdContent += '\n'
             elif child.tag == tag_prefix +'formula':
-
+                mdContent += ET.tostring(child, encoding='unicode')
                 mdContent += parse_formula_to_latex(child)
             else:
                 print('warning:'+child.tag)
+
     # extract figure
     # figureDict = {}
     # body_figure_list = root.findall('./tei:text/tei:body/tei:figure', namespaces=namespaces)
