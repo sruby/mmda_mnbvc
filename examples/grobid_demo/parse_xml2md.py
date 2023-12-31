@@ -18,6 +18,7 @@ def parse_formula_to_latex(formula_element):
 
 
 def parse_table_to_markdown(table_element):
+
     # 开始Markdown表格
     md_table = ""
 
@@ -86,32 +87,44 @@ def convert(xml_content):
             head_text = head_n + ' '+ head_text
         mdContent += f'\n## {head_text}\n'
 
+        tag_prefix =  '{http://www.tei-c.org/ns/1.0}'
         for child  in body_div:
-            if child.tag == 'p':
-                body_dev_p_list = body_div.findall('./tei:p', namespaces=namespaces)
-                for body_div_p in body_dev_p_list:
-                    body_div_p_s_list = body_div_p.findall('tei:s', namespaces=namespaces)
-                    for body_div_p_s in body_div_p_s_list :
-                        mdContent += f'{body_div_p_s.text}'
-                    mdContent += '\n'
-            elif child.tag == 'formula':
+            print("child.tag:"+child.tag , child.attrib)
+            if child.tag == tag_prefix + 'p':
+                # 段落前增加空格
+                mdContent +='  '
+                body_div_p_s_list = child.findall('tei:s', namespaces=namespaces)
+                for body_div_p_s in body_div_p_s_list :
+                    body_div_p_s_text = body_div_p_s.text
+                    print("body_div_p_s_text:"+body_div_p_s_text)
+                    mdContent += f'{body_div_p_s_text}'
+                #     extract figure无法正确抽取到节点
+                    ref_element  = body_div_p_s.find('./ref[@type="figure"]')
+                    if ref_element is not None:
+                        # target = ref_element.get('target')
+                        ref_element_tostring = ref_element.tostring()
+                        print(ref_element_tostring)
+                        mdContent += f'{ref_element_tostring}'
+                mdContent += '\n'
+            elif child.tag == tag_prefix +'formula':
+
                 mdContent += parse_formula_to_latex(child)
             else:
                 print('warning:'+child.tag)
     # extract figure
-    figureDict = {}
-    body_figure_list = root.findall('./tei:text/tei:body/tei:figure', namespaces=namespaces)
-    for body_figure in body_figure_list:
-        figure_type = body_figure.get('type')
-        figureid = body_figure.get('xml:id')
-        if figure_type is not None and figure_type == 'table':
-            tablecontent = parse_table_to_markdown(body_figure)
-            figureDict.put(figureid, tablecontent)
-        else:
-            figure_s = body_figure.findall('.//tei:s', namespaces=namespaces)
-            figure_graphic = ''
-            for figure_s in figure_s:
-                figure_graphic += f'{figure_s.text}'
+    # figureDict = {}
+    # body_figure_list = root.findall('./tei:text/tei:body/tei:figure', namespaces=namespaces)
+    # for body_figure in body_figure_list:
+    #     figure_type = body_figure.get('type')
+    #     figureid = body_figure.get('xml:id')
+    #     if figure_type is not None and figure_type == 'table':
+    #         tablecontent = parse_table_to_markdown(body_figure)
+    #         figureDict.put(figureid, tablecontent)
+    #     else:
+    #         figure_s = body_figure.findall('.//tei:s', namespaces=namespaces)
+    #         figure_graphic = ''
+    #         for figure_s in figure_s:
+    #             figure_graphic += f'{figure_s.text}'
 
 
     # extract reference
@@ -125,5 +138,5 @@ def convert(xml_content):
 XML_PATH = './e5910c027af0ee9c1901c57f6579d903aedee7f4.xml'
 xml = open(XML_PATH, encoding='utf-8').read()
 mdContent = convert(xml)
-with open('output2.md', 'w', encoding='utf-8') as f:
+with open('output.md', 'w', encoding='utf-8') as f:
         f.write(mdContent)
