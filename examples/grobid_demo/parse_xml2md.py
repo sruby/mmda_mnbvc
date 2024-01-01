@@ -108,13 +108,14 @@ def convert(xml_content):
                             if ref_type == 'bibr':
                                 # Convert bibliography reference to markdown citation format
                                 mdContent+=(f"[{elem.text}]")
-                                print('markdown_elements_bibr:', mdContent)
+                                # print('markdown_elements_bibr:', mdContent)
                             elif ref_type == 'figure':
                                 # Convert figure reference to markdown image format (as a placeholder here)
                                 mdContent+=(f"{elem.text}")
+                                # 只是引用的位置，不是图片实际位置,需要根据target跟目标figure匹配
                                 ref_string = ET.tostring(elem, encoding='unicode')
                                 mdContent += (f"{ref_string}")
-                                print('markdown_elements_figure:', mdContent)
+                                # print('markdown_elements_figure:', mdContent)
                         # Append the tail text if it exists (text after a subelement)
                         if elem.tail:
                             print(elem.tail)
@@ -126,21 +127,35 @@ def convert(xml_content):
             else:
                 print('warning:'+child.tag)
 
-    # extract figure
-    # figureDict = {}
-    # body_figure_list = root.findall('./tei:text/tei:body/tei:figure', namespaces=namespaces)
-    # for body_figure in body_figure_list:
-    #     figure_type = body_figure.get('type')
-    #     figureid = body_figure.get('xml:id')
-    #     if figure_type is not None and figure_type == 'table':
-    #         tablecontent = parse_table_to_markdown(body_figure)
-    #         figureDict.put(figureid, tablecontent)
-    #     else:
-    #         figure_s = body_figure.findall('.//tei:s', namespaces=namespaces)
-    #         figure_graphic = ''
-    #         for figure_s in figure_s:
-    #             figure_graphic += f'{figure_s.text}'
+    # extract figure and table
+    figure_dict = {}
+    table_dict = {}
+    body_figure_list = root.findall('./tei:text/tei:body/tei:figure', namespaces=namespaces)
+    for body_figure in body_figure_list:
+        figure_type = body_figure.get('type')
+        if figure_type is None:
+            graphic = body_figure.find('.//tei:graphic', namespaces=namespaces)
+            if graphic is not None:
+                xml_id = body_figure.get('{http://www.w3.org/XML/1998/namespace}id')
+                figure_dict[xml_id] = ET.tostring(graphic, encoding='unicode')
+                continue
+            continue
+        if figure_type == 'table':
+            # tablecontent = parse_table_to_markdown(body_figure)
+            # mdContent += tablecontent
+            xml_id = body_figure.get('{http://www.w3.org/XML/1998/namespace}id')
+            # remove rows
+            table = body_figure.find('./tei:table',namespaces)
+            for row in body_figure.findall('.//tei:row', namespaces):
+                table.remove(row)
+            table_dict[xml_id] = ET.tostring(body_figure, encoding='unicode')
+        else:
+            print('warning: figure type not supported,'+figure_type)
 
+    # Convert both dictionaries to Markdown
+    figure_markdown = dict_to_markdown('Figure',figure_dict)
+    table_markdown = dict_to_markdown('Table',table_dict)
+    mdContent += '\n' + figure_markdown + '\n' + table_markdown
 
     # extract reference
     back = root.find('.//tei:back', namespaces=namespaces)
@@ -148,6 +163,13 @@ def convert(xml_content):
     mdContent += '\n' + references
 
     return mdContent
+
+# Function to convert a single dictionary to Markdown format
+def dict_to_markdown(title,data_dict):
+    markdown_content = f"## {title}\n\n"
+    for key, value in data_dict.items():
+        markdown_content += f"### {key}\n\n{value}\n\n"
+    return markdown_content
 
 
 

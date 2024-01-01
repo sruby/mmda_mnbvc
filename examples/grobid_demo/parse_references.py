@@ -53,4 +53,5 @@ def xml_to_markdown(root,namespaces):
 
     # Join all references with new lines
     markdown_output = "\n".join(markdown_list)
+    markdown_output = "## References" + "\n\n" + markdown_output
     return markdown_output
