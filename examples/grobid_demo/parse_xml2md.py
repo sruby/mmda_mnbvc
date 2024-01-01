@@ -1,4 +1,5 @@
 import xml.etree.ElementTree as ET
+import parse_references
 
 # Define the namespaces used in the XML document
 namespaces = {
@@ -142,7 +143,9 @@ def convert(xml_content):
 
 
     # extract reference
-
+    back = root.find('.//tei:back', namespaces=namespaces)
+    references = parse_references.xml_to_markdown(back,namespaces)
+    mdContent += '\n' + references
 
     return mdContent
 
