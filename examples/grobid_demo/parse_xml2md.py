@@ -93,7 +93,7 @@ def convert(xml_content):
             print("child_tag:"+child.tag , child.attrib)
             if child.tag == tag_prefix + 'p':
                 # 段落前增加空格
-                mdContent +='  '
+                # mdContent +='  '
                 body_div_p_s_list = child.findall('tei:s', namespaces=namespaces)
                 for body_div_p_s in body_div_p_s_list :
                     body_div_p_s_text = body_div_p_s.text
@@ -115,7 +115,13 @@ def convert(xml_content):
                                 # 只是引用的位置，不是图片实际位置,需要根据target跟目标figure匹配
                                 ref_string = ET.tostring(elem, encoding='unicode')
                                 mdContent += (f"{ref_string}")
-                                # print('markdown_elements_figure:', mdContent)
+                            elif ref_type == 'table':
+                                mdContent+=(f"{elem.text}")
+                                # 只是引用的位置，不是图片实际位置,需要根据target跟目标figure匹配
+                                ref_string = ET.tostring(elem, encoding='unicode')
+                                mdContent += (f"{ref_string}")
+                            else:
+                                print('warning:ref_type:'+ref_type)
                         # Append the tail text if it exists (text after a subelement)
                         if elem.tail:
                             print(elem.tail)
